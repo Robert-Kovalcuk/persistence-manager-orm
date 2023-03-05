@@ -4,8 +4,7 @@ import sk.tuke.meta.persistence.PersistenceManager;
 import sk.tuke.meta.persistence.ReflectivePersistenceManager;
 
 import java.io.File;
-import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.*;
 import java.util.List;
 
 public class Main {
@@ -15,7 +14,7 @@ public class Main {
         Connection conn = DriverManager.getConnection("jdbc:sqlite:" + DB_PATH);
 
         PersistenceManager manager = new ReflectivePersistenceManager(
-                conn, Person.class, Department.class);
+                conn, Department.class, Person.class);
 
         manager.createTables();
 
@@ -33,12 +32,12 @@ public class Main {
         manager.save(hrasko);
         manager.save(mrkvicka);
         manager.save(novak);
-
+/*
         List<Person> persons = manager.getAll(Person.class);
         for (Person person : persons) {
             System.out.println(person);
             System.out.println("  " + person.getDepartment());
         }
-        conn.close();
+        conn.close();*/
     }
 }

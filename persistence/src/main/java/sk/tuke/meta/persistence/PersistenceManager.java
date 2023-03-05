@@ -1,5 +1,6 @@
 package sk.tuke.meta.persistence;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
@@ -54,7 +55,7 @@ public interface PersistenceManager {
      * @param entity the entity to be saved
      * @return the value of primary key
      */
-    long save(Object entity);
+    long save(Object entity) throws SQLException;
 
     /**
      * Delete the entity from the database, based on the primary key.

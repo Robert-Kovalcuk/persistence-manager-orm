@@ -39,7 +39,9 @@ public class Main {
         for (Department person : persons) {
             manager.delete(person);
         }*/
-        List<Person> result = manager.getBy(Person.class, "surname", "Janko");
-        System.out.println(result.size());
+        Person asd = new Person("asd", "asd2", 1000);
+        Department asdd = new Department("dep", "CODE");
+        asd.setDepartment(asdd);
+        manager.save(asd);
     }
 }

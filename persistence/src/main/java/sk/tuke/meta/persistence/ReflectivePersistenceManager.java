@@ -35,7 +35,6 @@ public class ReflectivePersistenceManager implements PersistenceManager {
 
     @Override
     public <T> Optional<T> get(Class<T> type, long id) throws PersistenceException {
-
         try {
             String idFieldName = Arrays.stream(type.getDeclaredFields()).filter(field -> field.getAnnotation(Id.class) != null).findFirst().get().getName();
             ResultSet result = this.queryManager.selectWhereId(id+"", type.getSimpleName(), idFieldName);
@@ -48,7 +47,6 @@ public class ReflectivePersistenceManager implements PersistenceManager {
                 return Optional.empty();
             }
         } catch (Exception e) {
-            e.printStackTrace();
             return Optional.empty();
         }
     }
@@ -145,8 +143,8 @@ public class ReflectivePersistenceManager implements PersistenceManager {
 
                 if(entitiesIdField != null) {
                     entitiesIdField.setAccessible(true);
-                    this.save(field.get(entity));
-                    value = entitiesIdField.get(field.get(entity));
+                    long id = this.save(field.get(entity));
+                    value = id;
                 } else {
                     value = field.get(entity);
                 }
@@ -167,6 +165,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
         }
 
         map.remove(idField.getName());
+
         try {
             try (ResultSet resultSet = queryManager.insertInto(entity.getClass().getSimpleName(), map)) {
                 return (Integer) resultSet.getObject(1);

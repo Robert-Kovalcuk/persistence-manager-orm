@@ -144,6 +144,7 @@ public class queryDataManager {
 
     public ResultSet update(String tableName, Map<String, ?> entries, long id, String idName) throws SQLException {
         StringBuilder sql = new StringBuilder("UPDATE " + tableName);
+
         sql.append(" SET ");
         for(Map.Entry<String, ?> entry : entries.entrySet()) {
             sql.append(entry.getKey()).append(" = ");
@@ -153,7 +154,7 @@ public class queryDataManager {
         sql.append(" WHERE ").append(idName).append("=").append(id);
 
         sql.append(";");
-        System.out.println(sql);
+
         return this.executeUpdate(sql.toString());
     }
 

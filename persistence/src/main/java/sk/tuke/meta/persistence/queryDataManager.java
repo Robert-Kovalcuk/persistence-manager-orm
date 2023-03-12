@@ -18,12 +18,24 @@ public class queryDataManager {
         this.connection = connection;
     }
 
-    private ResultSet execute(String sql) throws SQLException {
-        final Statement statement = this.connection.createStatement();
-
+    public ResultSet executeSelect(String sql) throws SQLException {
+        Statement statement = this.connection.createStatement();
         statement.execute(sql);
 
+        ResultSet resultSet = statement.getGeneratedKeys();
+        resultSet.next();
+
         return statement.getResultSet();
+    }
+
+    public ResultSet executeUpdate(String sql) throws SQLException {
+        Statement statement = this.connection.createStatement();
+        statement.execute(sql);
+
+        ResultSet resultSet = statement.getGeneratedKeys();
+        resultSet.next();
+
+        return resultSet;
     }
 
     public ResultSet createTableFromEntity(Field[] fields) throws SQLException {
@@ -36,7 +48,7 @@ public class queryDataManager {
         sql.append(");");
 
         //System.out.println(sql);
-        return this.execute(sql.toString());
+        return this.executeUpdate(sql.toString());
     }
 
     private StringBuilder sqlFromEntityFields(Field[] fields) {
@@ -61,7 +73,7 @@ public class queryDataManager {
         StringBuilder sql = new StringBuilder();
 
         if(hasAnnotation(field, Id.class)) {
-            sql.append(field.getName()).append(" ").append(field.getType()).append(" PRIMARY KEY, ");
+            sql.append(field.getName()).append(" ").append(sqlTypeFromField(field)).append(" PRIMARY KEY AUTOINCREMENT, ");
         } else if(hasAnnotation(field, ManyToOne.class)) {
             Optional<Field> annotatedType = Arrays.stream(field.getType().getDeclaredFields()).filter(val -> hasAnnotation(val, Id.class)).findFirst();
             Optional<Field> annotatedName = Arrays.stream(field.getType().getDeclaredFields()).filter(val -> hasAnnotation(val, Id.class)).findFirst();
@@ -95,25 +107,66 @@ public class queryDataManager {
     public String sqlTypeFromField(Field field) {
         Class<?> type = field.getType();
 
-        if(!type.isPrimitive()) {
-            if(type.getSimpleName().equals("String"))
-                return "text";
-        } else if(type.getSimpleName().equals("long")) {
-            return "int";
+        if(type.getSimpleName().equals("String"))
+                return "TEXT";
+        else if(type.getSimpleName().equals("long")) {
+            return "INTEGER";
         }
+
         return type.getSimpleName();
     }
 
     public ResultSet insertInto(String tableName, Map<String, ?> entries) throws SQLException {
-        StringBuilder sql = new StringBuilder("INSERT INTO " + tableName + " VALUES" + "(");
+        StringBuilder sql = new StringBuilder("INSERT INTO " + tableName);
+        sql.append("(");
+        for(Map.Entry<String, ?> entry : entries.entrySet()) {
+            sql.append(entry.getKey()).append(",");
+        }
+        sql.deleteCharAt(sql.length() - 1);
+        sql.append(")");
+        sql.append(" VALUES " + "(");
 
         for(Map.Entry<String, ?> entry : entries.entrySet()) {
-            sql.append(entry.getValue()).append(",");
+            if(entry.getValue() instanceof String) {
+                sql.append("\"");
+                sql.append(entry.getValue());
+                sql.append("\"").append(",");
+            } else {
+                sql.append(entry.getValue()).append(",");
+            }
         }
 
         sql.deleteCharAt(sql.length() - 1);
         sql.append(");");
+
+        return this.executeUpdate(sql.toString());
+    }
+
+    public ResultSet update(String tableName, Map<String, ?> entries, long id, String idName) throws SQLException {
+        StringBuilder sql = new StringBuilder("UPDATE " + tableName);
+        sql.append(" SET ");
+        for(Map.Entry<String, ?> entry : entries.entrySet()) {
+            sql.append(entry.getKey()).append(" = ");
+            sql.append("\"").append(entry.getValue()).append("\"").append(",");
+        }
+        sql.deleteCharAt(sql.length() - 1);
+        sql.append(" WHERE ").append(idName).append("=").append(id);
+
+        sql.append(";");
         System.out.println(sql);
-        return this.execute(sql.toString());
+        return this.executeUpdate(sql.toString());
+    }
+
+    public ResultSet selectWhereId(String id, String table, String primaryKeyName) {
+        try {
+            Statement statement = this.connection.createStatement();
+            StringBuilder select = new StringBuilder();
+
+            select.append("SELECT * FROM ").append(table).append(" WHERE ").append(primaryKeyName).append("=").append(id);
+
+            return executeSelect(select.toString());
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

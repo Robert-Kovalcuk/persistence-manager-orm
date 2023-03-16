@@ -5,7 +5,6 @@ import javax.persistence.Id;
 import javax.persistence.ManyToOne;
 import javax.persistence.PersistenceException;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.sql.*;
 import java.util.*;
 
@@ -36,31 +35,27 @@ public class ReflectivePersistenceManager implements PersistenceManager {
     @Override
     public <T> Optional<T> get(Class<T> type, long id) throws PersistenceException {
         try {
-            String idFieldName = Arrays.stream(type.getDeclaredFields()).filter(field -> field.getAnnotation(Id.class) != null).findFirst().get().getName();
-            ResultSet result = this.queryManager.selectWhereId(id+"", type.getSimpleName(), idFieldName);
+            String typeIdentifierFieldName = Arrays.stream(type.getDeclaredFields()).filter(field -> field.getAnnotation(Id.class) != null).findFirst().get().getName();
+            ResultSet result = this.queryManager.selectWhereId(id+"", type.getSimpleName(), typeIdentifierFieldName);
 
-            if (result.next()) {
-                T instance = getInstanceFromResult(type, result);
-
-                return Optional.of(instance);
-            } else {
+            if (result.next())
+                return Optional.of(getInstanceFromResult(type, result));
+            else
                 return Optional.empty();
-            }
         } catch (Exception e) {
+            e.printStackTrace();
             return Optional.empty();
         }
     }
 
-    private <T> T getInstanceFromResult(Class<T> type, ResultSet result) {
+    private <T> T getInstanceFromResult(Class<T> type, ResultSet queryResultSet) {
         try {
             T instance = type.getDeclaredConstructor().newInstance();
-            ResultSetMetaData metaData = result.getMetaData();
+            ResultSetMetaData metaData = queryResultSet.getMetaData();
 
-            int columnCount = metaData.getColumnCount();
-
-            for (int i = 1; i <= columnCount; i++) {
+            for (int i = 1; i <= metaData.getColumnCount(); i++) {
                 String columnName = metaData.getColumnName(i);
-                Object columnValue = result.getObject(columnName);
+                Object columnValue = queryResultSet.getObject(columnName);
                 Field field = type.getDeclaredField(columnName);
 
                 if (isEntity(field.getType())) {
@@ -72,6 +67,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
                     field.set(instance, columnValue);
                 }
             }
+
             return instance;
         } catch (Exception e) {
             throw new PersistenceException(e);
@@ -107,27 +103,30 @@ public class ReflectivePersistenceManager implements PersistenceManager {
     @Override
     public <T> List<T> getBy(Class<T> type, String fieldName, Object value) {
         List<T> list = new ArrayList<T>();
+
         try {
             ResultSet resultSet = this.queryManager.executeSelect("SELECT * FROM " + type.getSimpleName() + " WHERE " + fieldName + "=" + "\"" + value.toString() + "\"");
             while (resultSet.next()) {
                 list.add(getInstanceFromResult(type, resultSet));
             }
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            throw new PersistenceException(e);
         }
 
         return list;
     }
 
-    private Field getIdField(Object entity) {
-        Optional<Field> idField = Arrays.stream(entity.getClass().getDeclaredFields()).filter(field -> field.getAnnotation(Id.class) != null).findFirst();
-
-        return idField.orElse(null);
+    private Field getIdentifierField(Object entity) {
+        return Arrays.stream(
+                entity.getClass().getDeclaredFields()
+        ).filter(field -> field.getAnnotation(Id.class) != null)
+                .findFirst().orElse(null);
     }
 
     @Override
     public long save(Object entity) throws SQLException {
-        Field idField = this.getIdField(entity);
+        Field idField = this.getIdentifierField(entity);
         idField.setAccessible(true);
 
         Map<String, String> map = new HashMap<>();
@@ -151,6 +150,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
 
                 map.put(field.getName(), value.toString());
             } catch (IllegalAccessException e) {
+                e.printStackTrace();
                 throw new RuntimeException(e);
             }
         }
@@ -179,13 +179,16 @@ public class ReflectivePersistenceManager implements PersistenceManager {
 
     @Override
     public void delete(Object entity) {
-        Field field = getIdField(entity);
-        field.setAccessible(true);
+        Field field = getIdentifierField(entity);
+
+        if(field == null)
+            throw new PersistenceException("class " + entity.getClass() + "does not have @Entity annotation");
 
         try {
+            field.setAccessible(true);
             this.queryManager.executeSelect("DELETE FROM " + entity.getClass().getSimpleName() + " WHERE "+field.getName()+"="+field.get(entity)).close();
         } catch (SQLException | IllegalAccessException e) {
-            throw new RuntimeException(e);
+            throw new PersistenceException(e);
         }
     }
 }

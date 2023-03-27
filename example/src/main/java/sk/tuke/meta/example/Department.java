@@ -2,7 +2,11 @@ package sk.tuke.meta.example;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;
+import javax.persistence.Table;
 
+@Table(
+        name = "Department"
+)
 @Entity
 public class Department {
     @Id

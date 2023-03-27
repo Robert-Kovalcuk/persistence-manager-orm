@@ -3,7 +3,11 @@ package sk.tuke.meta.example;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.ManyToOne;
+import javax.persistence.Table;
 
+@Table(
+        name = "Person"
+)
 @Entity
 public class Person {
     @Id

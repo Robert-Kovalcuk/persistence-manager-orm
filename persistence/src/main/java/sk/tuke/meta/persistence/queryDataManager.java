@@ -1,5 +1,9 @@
 package sk.tuke.meta.persistence;
 
+import data.EntityDTO;
+import data.FieldDTO;
+import data.WhereOperation;
+
 import javax.persistence.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -8,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,6 +33,31 @@ public class queryDataManager {
         return statement.getResultSet();
     }
 
+    public ResultSet executeDelete(String tableName, String columnName, String value, WhereOperation operation) throws SQLException {
+        Statement statement = this.connection.createStatement();
+        statement.execute("DELETE * FROM " + tableName + " WHERE " + value + stringFromOperation(operation) + columnName);
+
+        ResultSet resultSet = statement.getGeneratedKeys();
+        resultSet.next();
+
+        return resultSet;
+    }
+
+    private String stringFromOperation(WhereOperation operation) {
+        switch (operation) {
+            case equals -> {
+                return "=";
+            }
+            case lessThan -> {
+                return "<";
+            }
+            case biggerThan -> {
+                return ">";
+            }
+        }
+        return "";
+    }
+
     public ResultSet executeUpdate(String sql) throws SQLException {
         Statement statement = this.connection.createStatement();
         statement.execute(sql);
@@ -38,11 +68,11 @@ public class queryDataManager {
         return resultSet;
     }
 
-    public ResultSet createTableFromEntity(Field[] fields) throws SQLException {
-        final String className = fields[0].getDeclaringClass().getSimpleName();
+    public ResultSet createTableFromEntity(EntityDTO entityDTO) throws SQLException {
+        final String className = entityDTO.getTableAnnotation().name();
 
         StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS " + className + "(");
-        sql.append(sqlFromEntityFields(fields));
+        sql.append(sqlFromEntityFields(entityDTO.getFields()));
         sql.deleteCharAt(sql.length() - 1);
         sql.deleteCharAt(sql.length() - 1);
         sql.append(");");
@@ -51,10 +81,10 @@ public class queryDataManager {
         return this.executeUpdate(sql.toString());
     }
 
-    private StringBuilder sqlFromEntityFields(Field[] fields) {
+    private StringBuilder sqlFromEntityFields(List<FieldDTO> fields) {
         StringBuilder sql = new StringBuilder();
         
-        for(Field field: fields) {
+        for(FieldDTO field: fields) {
             final StringBuilder sqlFromEntityAnnotations = sqlFromEntityAnnotations(field);
 
             if(!sqlFromEntityAnnotations.isEmpty())
@@ -69,12 +99,12 @@ public class queryDataManager {
         return sql;
     }
 
-    private StringBuilder sqlFromEntityAnnotations(Field field) {
+    private StringBuilder sqlFromEntityAnnotations(FieldDTO field) {
         StringBuilder sql = new StringBuilder();
 
-        if(hasAnnotation(field, Id.class)) {
+        if(field.isId()) {
             sql.append(field.getName()).append(" ").append(sqlTypeFromField(field)).append(" PRIMARY KEY AUTOINCREMENT, ");
-        } else if(hasAnnotation(field, ManyToOne.class)) {
+        } else if(field.holdsEntity()) {
             Optional<Field> annotatedType = Arrays.stream(field.getType().getDeclaredFields()).filter(val -> hasAnnotation(val, Id.class)).findFirst();
             Optional<Field> annotatedName = Arrays.stream(field.getType().getDeclaredFields()).filter(val -> hasAnnotation(val, Id.class)).findFirst();
 
@@ -84,7 +114,7 @@ public class queryDataManager {
 
             sql
                 .append(field.getName())
-                .append(" ").append(sqlTypeFromField(annotatedName.get()))
+                .append(" ").append(sqlTypeFromField(field))
                 .append(", ")
                 .append("FOREIGN KEY (")
                 .append(field.getName())
@@ -104,8 +134,8 @@ public class queryDataManager {
         return field.getAnnotation(a) != null;
     }
 
-    public String sqlTypeFromField(Field field) {
-        Class<?> type = field.getType();
+    public String sqlTypeFromField(FieldDTO field) {
+        Class<?> type = field.getField().getType();
 
         if(type.getSimpleName().equals("String"))
                 return "TEXT";

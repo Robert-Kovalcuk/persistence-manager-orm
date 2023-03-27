@@ -39,9 +39,5 @@ public class Main {
         for (Department person : persons) {
             manager.delete(person);
         }*/
-        Person asd = new Person("asd", "asd2", 1000);
-        Department asdd = new Department("dep", "CODE");
-        asd.setDepartment(asdd);
-        manager.save(asd);
     }
 }

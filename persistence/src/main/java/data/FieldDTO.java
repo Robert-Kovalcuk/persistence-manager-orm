@@ -11,7 +11,7 @@ public class FieldDTO {
     private final String name;
     private final Column columnAnnotation;
 
-    public Field getField() {
+    private Field getField() {
         return field;
     }
 
@@ -20,7 +20,7 @@ public class FieldDTO {
     }
 
     public String getName() {
-        return name;
+        return this.columnAnnotation.name() == null ? this.field.getName() : this.columnAnnotation.name();
     }
 
     public Column getColumnAnnotation() {
@@ -37,6 +37,8 @@ public class FieldDTO {
     public boolean isId() {
         return this.field.getAnnotation(Id.class) != null;
     }
+
+    public boolean isUnique() {return this.columnAnnotation != null && this.columnAnnotation.unique();}
 
     public boolean holdsEntity() {
         return this.field.getAnnotation(ManyToOne.class) != null;

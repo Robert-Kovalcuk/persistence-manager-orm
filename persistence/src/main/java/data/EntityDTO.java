@@ -1,21 +1,33 @@
 package data;
 
 import javax.persistence.Id;
-import javax.persistence.PersistenceException;
 import javax.persistence.Table;
 import java.lang.reflect.Field;
 import java.util.*;
 
 public class EntityDTO {
+    public Object getEntity() {
+        return entity;
+    }
+
+    public void setEntity(Object entity) {
+        this.entity = entity;
+    }
+
+    public Object entity;
     private Table tableAnnotation;
     private FieldDTO idField;
     private List<FieldDTO> fields = new ArrayList<>();
+
+    private String name;
 
     private EntityDTO() {}
 
     public Table getTableAnnotation() {
         return this.tableAnnotation;
     }
+
+    public String getName() { return this.name;}
 
     public List<FieldDTO> getFields() {
         return this.fields;
@@ -29,10 +41,10 @@ public class EntityDTO {
         EntityDTO entityDTO = new EntityDTO();
 
         entityDTO.tableAnnotation = clazz.getAnnotation(Table.class);
-
-        if(entityDTO.tableAnnotation == null) {
-            throw new PersistenceException("Entity is not a table. Table annotation is missing at " + clazz.getSimpleName());
-        }
+        if(entityDTO.tableAnnotation != null)
+            entityDTO.name = entityDTO.tableAnnotation.name();
+        else
+            entityDTO.name = clazz.getSimpleName();
 
         for (Field declaredField : clazz.getDeclaredFields()) {
             entityDTO.fields.add(new FieldDTO(declaredField));
@@ -42,4 +54,24 @@ public class EntityDTO {
 
         return entityDTO;
     }
+
+    public static EntityDTO fromTypeWithObject(Class<?> clazz, Object entity) {
+        EntityDTO entityDTO = new EntityDTO();
+        entityDTO.entity = entity;
+        entityDTO.tableAnnotation = clazz.getAnnotation(Table.class);
+        if(entityDTO.tableAnnotation != null)
+            entityDTO.name = entityDTO.tableAnnotation.name();
+        else
+            entityDTO.name = clazz.getSimpleName();
+
+        for (Field declaredField : clazz.getDeclaredFields()) {
+            entityDTO.fields.add(new FieldDTO(declaredField));
+            if(declaredField.getAnnotation(Id.class) != null)
+                entityDTO.idField = new FieldDTO(declaredField);
+        }
+
+        return entityDTO;
+    }
+
+    public boolean hasTableAnnotation() {return this.tableAnnotation != null;}
 }

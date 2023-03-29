@@ -1,6 +1,6 @@
 package data;
 
-public enum WhereOperation {
+public enum WhereOperator {
     equals,
     lessThan,
     biggerThan

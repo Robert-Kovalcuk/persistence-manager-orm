@@ -1,12 +1,11 @@
 package sk.tuke.meta.example;
 
+import data.WhereOperator;
 import sk.tuke.meta.persistence.PersistenceManager;
 import sk.tuke.meta.persistence.ReflectivePersistenceManager;
+import sk.tuke.meta.persistence.query.*;
 
-import java.io.File;
 import java.sql.*;
-import java.util.List;
-import java.util.Optional;
 
 public class Main {
     public static final String DB_PATH = "test.db";
@@ -17,7 +16,10 @@ public class Main {
         PersistenceManager manager = new ReflectivePersistenceManager(
                 conn, Department.class, Person.class);
 
-        manager.createTables();
+        //manager.createTables();
+
+        QueryManager queryManager = new QueryManager(conn);
+        queryManager.select("table", new Condition(2+"", 3+"", WhereOperator.biggerThan),"column1", "column2", "column3");
 
         /*Department development = new Department("Development", "DVLP");
         Department marketing = new Department("Marketing", "MARK");

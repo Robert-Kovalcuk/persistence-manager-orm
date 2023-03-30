@@ -4,7 +4,6 @@ import data.EntityDTO;
 import data.WhereOperator;
 
 import java.sql.*;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -16,9 +15,85 @@ public class QueryManager implements IQueryManager {
         this.connection = connection;
     }
 
+    @Override
+    public EntityDTO dtoFromType(Class<?> clazz) {
+        return EntityDTO.fromType(clazz);
+    }
+
+    @Override
+    public EntityDTO dtoFromObject(Object object) {
+        return EntityDTO.fromTypeWithObject(object);
+    }
+
+    @Override
+    public Optional<ResultSet> select(String table, Condition condition, String... selectedColumns) {
+        try {
+            String query = "SELECT " + stringFromVararg(selectedColumns) + " " + "FROM " + table + " WHERE " + conditionToString(condition);
+            System.out.println(query);
+            return Optional.of(this.connection.prepareStatement(query).executeQuery());
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public Optional<ResultSet> select(String table, String... selectedColumns) {
+        try {
+            String query = "SELECT " + stringFromVararg(selectedColumns) + " " + "FROM " + table;
+            System.out.println(query);
+            return Optional.of(this.connection.prepareStatement(query).executeQuery());
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return Optional.empty();
+        }
+    }
+
+    private static String stringFromVararg(String[] selectedColumns) {
+        return Arrays.toString(selectedColumns).replace("[", "").replace("]", "");
+    }
+
+    private static String conditionToString(Condition condition) {
+        return condition.getOperand1() + condition.operatorToString() + condition.getOperand2();
+    }
+
+    @Override
+    public Optional<ResultSet> insert(EntityDTO entityDTO) {
+        try {
+            String insertQuery = InsertQueryFormatter.format(entityDTO);
+            System.out.println(insertQuery);
+            return Optional.of(this.connection.createStatement().executeQuery(insertQuery));
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public ResultSet delete(EntityDTO entityDTO) {
+        ResultSet resultSet;
+        try {
+            Statement statement;
+            statement = this.connection.createStatement();
+            statement.execute("DELETE * FROM " + entityDTO.getName() + " WHERE " + entityDTO.getIdField().valueFrom(entityDTO.entity) + stringFromOperation(WhereOperator.equals) + entityDTO.getIdField().getName());
+
+            resultSet = statement.getGeneratedKeys();
+            resultSet.next();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+        return resultSet;
+    }
+
+    @Override
+    public ResultSet update(EntityDTO entityDTO) {
+        return null;
+    }
+
     public ResultSet selectCondition(String tableName, String columnName, String value, WhereOperator operation) throws SQLException {
         Statement statement = this.connection.createStatement();
-        statement.execute("SELECT * FROM " + tableName + " WHERE " + columnName + operation + value);
+        statement.execute("SELECT * FROM " + tableName + " WHERE " + columnName + stringFromOperation(operation) + value);
 
         ResultSet resultSet = statement.getGeneratedKeys();
         resultSet.next();
@@ -37,18 +112,9 @@ public class QueryManager implements IQueryManager {
     }
 
     public ResultSet executeAndGetKeys(String sql) throws SQLException {
+        System.out.println(sql);
         Statement statement = this.connection.createStatement();
         statement.execute(sql);
-
-        ResultSet resultSet = statement.getGeneratedKeys();
-        resultSet.next();
-
-        return resultSet;
-    }
-
-    public ResultSet delete(String tableName, String columnName, String value, WhereOperator operation) throws SQLException {
-        Statement statement = this.connection.createStatement();
-        statement.execute("DELETE * FROM " + tableName + " WHERE " + value + stringFromOperation(operation) + columnName);
 
         ResultSet resultSet = statement.getGeneratedKeys();
         resultSet.next();
@@ -75,7 +141,6 @@ public class QueryManager implements IQueryManager {
         return this.executeAndGetKeys(TableCreationService.createTable(entityDTO));
     }
 
-
     public ResultSet update(String tableName, Map<String, ?> entries, long id, String idName) throws SQLException {
         StringBuilder sql = new StringBuilder("UPDATE " + tableName);
 
@@ -90,59 +155,5 @@ public class QueryManager implements IQueryManager {
         sql.append(";");
 
         return this.executeAndGetKeys(sql.toString());
-    }
-
-    @Override
-    public Optional<ResultSet> select(String table, Condition condition, String... selectedColumns) {
-        try {
-            String query = "SELECT " + stringFromVararg(selectedColumns) + " " + "FROM " + table + " WHERE " + conditionToString(condition);
-
-            return Optional.of(this.connection.prepareStatement(query).executeQuery());
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return Optional.empty();
-        }
-    }
-
-    @Override
-    public Optional<ResultSet> select(String table, String... selectedColumns) {
-        try {
-            String query = "SELECT " + stringFromVararg(selectedColumns) + " " + "FROM " + table;
-
-            return Optional.of(this.connection.prepareStatement(query).executeQuery());
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return Optional.empty();
-        }
-    }
-
-    private static String stringFromVararg(String[] selectedColumns) {
-        return Arrays.toString(selectedColumns).replace("[", "").replace("]", "");
-    }
-
-    private static String conditionToString(Condition condition) {
-        return condition.getOperand1() + condition.operatorToString() + condition.getOperand2();
-    }
-
-    @Override
-    public Optional<ResultSet> insert(EntityDTO entityDTO) {
-        try {
-            String insertQuery = InsertQueryFormatter.format(tableName, entries);
-
-            return Optional.of(this.connection.prepareStatement(insertQuery).executeQuery());
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return Optional.empty();
-        }
-    }
-
-    @Override
-    public ResultSet delete(String table) {
-        return null;
-    }
-
-    @Override
-    public ResultSet update() {
-        return null;
     }
 }

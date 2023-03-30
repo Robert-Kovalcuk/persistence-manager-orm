@@ -92,7 +92,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
 
     @Override
     public long save(Object entity) throws SQLException {
-        EntityDTO entityDTO = EntityDTO.fromTypeWithObject(entity.getClass(), entity);
+        EntityDTO entityDTO = this.queryManager.dtoFromObject(entity);
 
         Map<String, String> map = new HashMap<>();
 
@@ -102,7 +102,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
 
             Object value;
 
-            if(entitiesIdField != null) {
+            if (entitiesIdField != null) {
                 entitiesIdField.setAccessible(true);
                 value = this.save(field.valueFrom(entity));
             } else {
@@ -112,19 +112,18 @@ public class ReflectivePersistenceManager implements PersistenceManager {
             map.put(field.getName(), value.toString());
         }
 
-        if(this.get(entity.getClass(), (long) entityDTO.getIdField().valueFrom(entity))
+        if (this.get(entity.getClass(), (long) entityDTO.getIdField().valueFrom(entity))
                 .isPresent()) {
             this.queryManager.update(entityDTO);
             return (Integer) entityDTO.getIdField().valueFrom(entity);
         } else {
             map.remove(entityDTO.getIdField().getName());
 
-            try (Optional<ResultSet> resultSet = queryManager.insert(entityDTO)) {
-                if(resultSet.isPresent())
-                    return (Integer) resultSet.getObject(1);
-            }
+            Optional<ResultSet> resultSet = queryManager.insert(entityDTO);
+            if (resultSet.isPresent())
+                return (Integer) resultSet.get().getObject(1);
         }
-
+        return 0;
     }
 
     @Override
@@ -135,12 +134,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
             throw new PersistenceException("class " + entity.getClass() + "does not have @Entity annotation");
 
         try {
-            this.queryManager.delete(
-                    entityDTO.getTableAnnotation().name(),
-                    entityDTO.getIdField().getName(),
-                    entityDTO.getIdField().valueFrom(entity).toString(),
-                    WhereOperator.equals
-            ).close();
+            this.queryManager.delete(entityDTO).close();
         } catch (SQLException e) {
             throw new PersistenceException(e);
         }

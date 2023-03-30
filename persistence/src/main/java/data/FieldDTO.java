@@ -20,7 +20,7 @@ public class FieldDTO {
     }
 
     public String getName() {
-        return this.columnAnnotation.name() == null ? this.field.getName() : this.columnAnnotation.name();
+        return this.columnAnnotation == null ? this.field.getName() : this.columnAnnotation.name();
     }
 
     public Column getColumnAnnotation() {

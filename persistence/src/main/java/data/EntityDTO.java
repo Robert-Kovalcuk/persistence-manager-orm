@@ -6,14 +6,6 @@ import java.lang.reflect.Field;
 import java.util.*;
 
 public class EntityDTO {
-    public Object getEntity() {
-        return entity;
-    }
-
-    public void setEntity(Object entity) {
-        this.entity = entity;
-    }
-
     public Object entity;
     private Table tableAnnotation;
     private FieldDTO idField;
@@ -55,8 +47,9 @@ public class EntityDTO {
         return entityDTO;
     }
 
-    public static EntityDTO fromTypeWithObject(Class<?> clazz, Object entity) {
+    public static EntityDTO fromTypeWithObject(Object entity) {
         EntityDTO entityDTO = new EntityDTO();
+        Class<?> clazz = entity.getClass();
         entityDTO.entity = entity;
         entityDTO.tableAnnotation = clazz.getAnnotation(Table.class);
         if(entityDTO.tableAnnotation != null)

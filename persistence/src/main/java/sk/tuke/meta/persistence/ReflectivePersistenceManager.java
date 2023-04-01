@@ -6,33 +6,81 @@ import data.WhereOperator;
 import sk.tuke.meta.persistence.query.QueryManager;
 
 import javax.persistence.*;
+import javax.tools.FileObject;
+import javax.tools.StandardLocation;
+import java.io.*;
 import java.lang.reflect.Field;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ReflectivePersistenceManager implements PersistenceManager {
     private QueryManager queryManager;
-    private Class<?>[] types;
 
-    public ReflectivePersistenceManager(Connection connection, Class<?>... types) {
+    public ReflectivePersistenceManager(Connection connection) {
         this.queryManager = new QueryManager(connection);
-        this.types = types;
     }
 
     @Override
     public void createTables() {
-        for (Class<?> classType : this.types) {
-            try {
-                this.createTable(classType);
-            } catch (SQLException e) {
-                e.printStackTrace();
-                throw new PersistenceException(e);
+        try {
+            ArrayList<String> filePaths = this.getSqlFilePaths();
+            for (String filePath : filePaths) {
+                this.createTable(filePath);
             }
+        } catch (IOException | SQLException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    private ResultSet createTable(Class<?> entity) throws SQLException {
-        return this.queryManager.createTable(EntityDTO.fromType(entity));
+    private ArrayList<String> getSqlFilePaths() throws IOException {
+        URL sqlDir = getClass().getResource("/sql");
+        ArrayList<String> paths = new ArrayList<>();
+
+        if(sqlDir == null)
+            return new ArrayList<>();
+
+        InputStream stream = sqlDir.openConnection().getInputStream();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(stream), 1024);
+
+        String line;
+        while ((line = reader.readLine()) != null)
+            if(line.endsWith(".sql"))
+                paths.add(line);
+
+        return paths;
+    }
+
+    private ResultSet createTable(String path) throws SQLException, IOException {
+        ClassLoader classLoader = getClass().getClassLoader();
+        InputStream stream = classLoader.getResourceAsStream("sql/" + path);
+
+        if (stream == null)
+            return null;
+
+        String sqlFromFile = this.readInputStream(stream);
+
+        try {
+            return this.queryManager.executeAndGetKeys(sqlFromFile);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new PersistenceException(e);
+        }
+    }
+
+    public String readInputStream(InputStream inputStream) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+
+        int nRead;
+        byte[] data = new byte[1024];
+
+        while ((nRead = inputStream.read(data, 0, data.length)) != -1) {
+            buffer.write(data, 0, nRead);
+        }
+
+        return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
     }
 
     @Override

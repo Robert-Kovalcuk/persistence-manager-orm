@@ -12,9 +12,9 @@ public class Main {
         Connection conn = DriverManager.getConnection("jdbc:sqlite:" + DB_PATH);
 
         PersistenceManager manager = new ReflectivePersistenceManager(
-                conn, Department.class, Person.class);
+                conn);
 
-        //manager.createTables();
+        manager.createTables();
         //Department development = new Department("Development", "DVLP");
         //manager.save(development);
         /*Department development = new Department("Development", "DVLP");

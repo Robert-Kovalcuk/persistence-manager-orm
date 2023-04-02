@@ -2,7 +2,6 @@ package sk.tuke.meta.example;
 
 import sk.tuke.meta.persistence.PersistenceManager;
 import sk.tuke.meta.persistence.ReflectivePersistenceManager;
-
 import java.sql.*;
 
 public class Main {

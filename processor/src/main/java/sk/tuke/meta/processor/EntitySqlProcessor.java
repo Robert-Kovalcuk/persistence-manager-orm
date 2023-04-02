@@ -1,6 +1,6 @@
 package sk.tuke.meta.processor;
 
-import sk.tuke.meta.processor.CreateTableSqlService.EntitySqlService;
+import sk.tuke.meta.processor.SQLGeneratorServices.EntitySQLGenerator;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -37,10 +37,9 @@ public class EntitySqlProcessor extends AbstractProcessor {
 
     private void generateAndSaveSQL(Element element) throws IOException {
         FileObject jfo = createResource(element);
-        EntitySqlService entitySqlService = new EntitySqlService(processingEnv);
 
         try (Writer writer = jfo.openWriter()) {
-            writer.write(entitySqlService.sqlFromTableElement(element));
+            writer.write(new EntitySQLGenerator(processingEnv).generateFrom(element));
         }
     }
 

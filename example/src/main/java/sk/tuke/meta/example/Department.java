@@ -1,5 +1,8 @@
 package sk.tuke.meta.example;
 
+import sk.tuke.meta.annotation.NotNull;
+import sk.tuke.meta.annotation.Unique;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
@@ -12,6 +15,9 @@ import javax.persistence.Table;
 public class Department {
     @Id
     private long pk;
+
+    @NotNull
+    @Unique
     @Column(name = "name")
     private String name;
     private String code;

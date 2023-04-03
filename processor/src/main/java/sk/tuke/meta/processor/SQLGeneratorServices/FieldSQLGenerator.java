@@ -7,18 +7,21 @@ import sk.tuke.meta.annotation.Unique;
 import sk.tuke.meta.processor.Exceptions.SQLGeneratorException;
 
 import javax.annotation.processing.ProcessingEnvironment;
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import java.lang.annotation.Annotation;
+import java.util.List;
 import java.util.Optional;
 
 public class FieldSQLGenerator implements ISQLGenerator<VariableElement> {
     ProcessingEnvironment processingEnvironment;
+
     public FieldSQLGenerator(ProcessingEnvironment processingEnv) {
-     this.processingEnvironment = processingEnv;
+        this.processingEnvironment = processingEnv;
     }
 
     @Override
@@ -27,15 +30,37 @@ public class FieldSQLGenerator implements ISQLGenerator<VariableElement> {
             return genSQLCodeWithIdAnnotation(variableElement);
         } else if (this.isAnnotatedWith(variableElement, Entity.class)) {
             return genSQLCodeWithEntityAnnotation(variableElement);
-        } else if(this.isAnnotatedWith(variableElement, Unique.class)){
-            return this.genSQLCodeWithAnnotation(variableElement, Unique.class);
-        } else if(this.isAnnotatedWith(variableElement, Null.class)) {
-            return this.genSQLCodeWithAnnotation(variableElement, Null.class);
-        } else if(this.isAnnotatedWith(variableElement, NotNull.class)) {
-            return this.genSQLCodeWithAnnotation(variableElement, NotNull.class);
-        } else {
-            return genSQLCode(variableElement);
+        } else if (this.hasSQLCompatibleFieldAnnotation(variableElement)) {
+
         }
+    }
+
+    private String test(VariableElement variableElement) throws ClassNotFoundException {
+        StringBuilder sql = new StringBuilder();
+        sql.append(this.genSQLCode(variableElement));
+        sql.deleteCharAt(sql.length());
+        List<? extends AnnotationMirror> compatibleAnnotations = this.typeElementFrom(variableElement).getAnnotationMirrors().stream().filter(
+            annotationMirror -> {
+                try {
+                    return this.hasSQLCompatibleFieldAnnotation(Class.forName(annotationMirror.getAnnotationType().asElement().asType().toString()).getDeclaringClass());
+                } catch (ClassNotFoundException e) {
+                    return false;
+                }
+            }).toList();
+
+        for (AnnotationMirror annotationMirror : compatibleAnnotations) {
+            String annotationType = annotationMirror.getAnnotationType().asElement().asType().toString();
+            Class<?> annotationClass = Class.forName(annotationType).getDeclaringClass();
+
+            if (this.isAnnotatedWith(variableElement, Unique.class))
+                sql.append(this.genSQLCodeWithAnnotation(variableElement, annotationClass));
+            if (this.isAnnotatedWith(variableElement, Null.class))
+                sql.append(this.genSQLCodeWithAnnotation(variableElement, Null.class));
+            if (this.isAnnotatedWith(variableElement, NotNull.class))
+                sql.append(this.genSQLCodeWithAnnotation(variableElement, NotNull.class));
+        }
+
+        return sql.toString();
     }
 
     private String genSQLCode(VariableElement sqlCompatible) {
@@ -63,7 +88,7 @@ public class FieldSQLGenerator implements ISQLGenerator<VariableElement> {
         return String.format("%s %s, FOREIGN KEY (%s) REFERENCES %s(%s),", fieldName, fieldType, fieldName, referencedTableName, referencedFieldName);
     }
 
-    private <T extends Annotation> String genSQLCodeWithAnnotation(VariableElement variableElement, Class<T> annotation) {
+    private <T extends Annotation> String genSQLCodeWithAnnotation(VariableElement variableElement, Class<?> annotation) {
         String fieldName = variableElement.getSimpleName().toString();
         String fieldType = this.getType(variableElement);
 
@@ -90,6 +115,14 @@ public class FieldSQLGenerator implements ISQLGenerator<VariableElement> {
     private <T extends Annotation> boolean isAnnotatedWith(VariableElement variableElement, Class<T> annotation) {
         TypeElement typeElement = this.typeElementFrom(variableElement);
         return typeElement != null && typeElement.getAnnotation(annotation) != null;
+    }
+
+    private boolean hasSQLCompatibleFieldAnnotation(Class<?> variableElement) {
+        TypeElement typeElement = this.typeElementFrom(variableElement);
+
+        return typeElement != null && (typeElement.getAnnotation(Unique.class) != null ||
+                typeElement.getAnnotation(Null.class) != null ||
+                typeElement.getAnnotation(NotNull.class) != null);
     }
 
     private TypeElement typeElementFrom(VariableElement variableElement) {

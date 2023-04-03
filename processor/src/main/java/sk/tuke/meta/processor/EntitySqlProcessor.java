@@ -19,6 +19,9 @@ import java.util.Set;
 public class EntitySqlProcessor extends AbstractProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        if(annotations.isEmpty())
+            return true;
+
         for (Element validatedElement : roundEnv.getElementsAnnotatedWith(Table.class)) {
             try {
                 this.generateAndSaveSQL(validatedElement);

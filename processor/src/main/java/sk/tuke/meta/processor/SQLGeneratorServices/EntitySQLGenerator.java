@@ -25,20 +25,12 @@ public class EntitySQLGenerator implements ISQLGenerator<Element> {
 
         element.getEnclosedElements().stream()
                 .filter(e -> e.getKind() == ElementKind.FIELD)
-                .forEach(field -> {
-                    try {
-                        stringBuilder.append(this.genSQLFromVariableElement((VariableElement) field));
-                    } catch (SQLGeneratorException e) {
-                        throw new RuntimeException(e);
-                    }
+                .forEach(fieldKind -> {
+                    stringBuilder.append(this.fieldSQLGenerator.generateFrom((VariableElement) fieldKind));
                 });
 
         stringBuilder.deleteCharAt(stringBuilder.length() - 1);
         return stringBuilder.toString();
-    }
-
-    private String genSQLFromVariableElement(VariableElement variableElement) throws SQLGeneratorException {
-        return this.fieldSQLGenerator.generateFrom(variableElement);
     }
 
     private String nameOf(Element element) {

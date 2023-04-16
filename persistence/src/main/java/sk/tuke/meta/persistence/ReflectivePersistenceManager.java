@@ -6,15 +6,14 @@ import data.WhereOperator;
 import sk.tuke.meta.persistence.query.QueryManager;
 
 import javax.persistence.*;
-import javax.tools.FileObject;
-import javax.tools.StandardLocation;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 public class ReflectivePersistenceManager implements PersistenceManager {
     private QueryManager queryManager;
@@ -39,7 +38,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
         URL sqlDir = getClass().getResource("/sql");
         ArrayList<String> paths = new ArrayList<>();
 
-        if(sqlDir == null)
+        if (sqlDir == null)
             return new ArrayList<>();
 
         InputStream stream = sqlDir.openConnection().getInputStream();
@@ -47,7 +46,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
 
         String line;
         while ((line = reader.readLine()) != null)
-            if(line.endsWith(".sql"))
+            if (line.endsWith(".sql"))
                 paths.add(line);
 
         return paths;
@@ -80,14 +79,14 @@ public class ReflectivePersistenceManager implements PersistenceManager {
             buffer.write(data, 0, nRead);
         }
 
-        return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+        return buffer.toString(StandardCharsets.UTF_8);
     }
 
     @Override
     public <T> Optional<T> get(Class<T> type, long id) throws PersistenceException {
         try {
             EntityDTO entityDTO = EntityDTO.fromType(type);
-            ResultSet result = this.queryManager.selectCondition(entityDTO.getName(), entityDTO.getIdField().getName(), id+"", WhereOperator.equals);
+            ResultSet result = this.queryManager.selectCondition(entityDTO.getName(), entityDTO.getIdField().getName(), id + "", WhereOperator.equals);
 
             return result.next() ? Optional.of(instanceFromResultSet(type, result)) : Optional.empty();
         } catch (Exception e) {
@@ -139,46 +138,66 @@ public class ReflectivePersistenceManager implements PersistenceManager {
     }
 
     @Override
-    public long save(Object entity) throws SQLException {
-        EntityDTO entityDTO = this.queryManager.dtoFromObject(entity);
+    public long save(Object entity) {
+        if (entity == null)
+            return 0;
 
-        Map<String, String> map = new HashMap<>();
+        EntityDTO dtoFromEntity = this.queryManager.dtoFromObject(entity);
 
-        for (FieldDTO field : entityDTO.getFields()) {
-            Optional<Field> entitiesIdFieldOptional = Arrays.stream(field.getType().getDeclaredFields()).filter(val -> val.getAnnotation(Id.class) != null).findFirst();
-            Field entitiesIdField = entitiesIdFieldOptional.orElse(null);
+        Stream<FieldDTO> fieldsHoldingEntities = dtoFromEntity.getFields()
+                .stream()
+                .filter(fieldDTO -> fieldDTO.holdsEntity() && fieldDTO.valueFrom(entity).isPresent());
 
-            Object value;
-
-            if (entitiesIdField != null) {
-                entitiesIdField.setAccessible(true);
-                value = this.save(field.valueFrom(entity));
-            } else {
-                value = field.valueFrom(entity);
+        fieldsHoldingEntities.forEach(fieldDTO -> {
+            long embeddedId;
+            Optional<Object> objectOptional = fieldDTO.valueFrom(entity);
+            if (objectOptional.isPresent()) {
+                embeddedId = save(objectOptional.get());
+                EntityDTO embeddedEntity = EntityDTO.fromTypeWithObject(objectOptional.get());
+                if (!embeddedEntity.getIdField().setValueAt(embeddedEntity.entity, embeddedId)) {
+                    System.out.println("something went wrong");
+                }
             }
+        });
 
-            map.put(field.getName(), value.toString());
-        }
-
-        if (this.get(entity.getClass(), (long) entityDTO.getIdField().valueFrom(entity))
-                .isPresent()) {
-            this.queryManager.update(entityDTO);
-            return (Integer) entityDTO.getIdField().valueFrom(entity);
+        Optional<Object> optionalEmbedded = dtoFromEntity.getIdField().valueFrom(entity);
+        if (optionalEmbedded.isEmpty()) {
+            return 0;
         } else {
-            map.remove(entityDTO.getIdField().getName());
-
-            Optional<ResultSet> resultSet = queryManager.insert(entityDTO);
-            if (resultSet.isPresent())
-                return (Integer) resultSet.get().getObject(1);
+            System.out.println(optionalEmbedded.get().getClass());
         }
-        return 0;
+
+        long id;
+        id = (long) optionalEmbedded.get();
+
+        if (id != 0) {
+            try {
+                this.queryManager.update(dtoFromEntity);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            Optional<ResultSet> resultSet = queryManager.insert(dtoFromEntity);
+            if (resultSet.isPresent()) {
+                try {
+                    id = resultSet.get().getLong(1);
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                return 0;
+            }
+        }
+
+        return id;
     }
+
 
     @Override
     public void delete(Object entity) {
         EntityDTO entityDTO = EntityDTO.fromType(entity.getClass());
 
-        if(entityDTO.getIdField() == null)
+        if (entityDTO.getIdField() == null)
             throw new PersistenceException("class " + entity.getClass() + "does not have @Entity annotation");
 
         try {
@@ -196,11 +215,24 @@ public class ReflectivePersistenceManager implements PersistenceManager {
             for (int i = 1; i <= metaData.getColumnCount(); i++) {
                 String columnName = metaData.getColumnName(i);
                 Object columnValue = queryResultSet.getObject(columnName);
-                Field field = type.getDeclaredField(columnName);
+                Stream<Field> fieldStream = Arrays.stream(instance.getClass().getDeclaredFields()).filter(field -> field.getAnnotation(Column.class) != null && field.getAnnotation(Column.class).name().equals(columnName));
+                Optional<Field> first = fieldStream.findFirst();
+                Field field;
+
+                if(first.isPresent())
+                    field = type.getDeclaredField(first.get().getName());
+                else {
+                    field = type.getDeclaredField(columnName);
+                }
 
                 if (isEntity(field.getType())) {
-                    Object nestedEntity = this.get(field.getType(), (int) columnValue).orElse(null);
-                    field.setAccessible(true); // Set the field to be accessible
+                    Object nestedEntity = field.getType().getInterfaces()[0].cast(
+                            LazyLoadingProxy.createProxy(field.getType().getInterfaces()[0], () -> {
+                                return field.getType().getInterfaces()[0].cast(this.get(field.getType(), (int) columnValue).orElse(null));
+                            })
+                    );
+
+                    field.setAccessible(true);
                     field.set(instance, nestedEntity);
                 } else {
                     field.setAccessible(true);
@@ -210,6 +242,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
 
             return instance;
         } catch (Exception e) {
+            e.printStackTrace();
             throw new PersistenceException(e);
         }
     }

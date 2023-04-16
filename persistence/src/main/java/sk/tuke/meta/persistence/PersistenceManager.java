@@ -55,7 +55,7 @@ public interface PersistenceManager {
      * @param entity the entity to be saved
      * @return the value of primary key
      */
-    long save(Object entity) throws SQLException;
+    long save(Object entity);
 
     /**
      * Delete the entity from the database, based on the primary key.

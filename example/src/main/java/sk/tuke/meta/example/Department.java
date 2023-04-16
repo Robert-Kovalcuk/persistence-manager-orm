@@ -9,17 +9,17 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 
 @Table(
-        name = "Department"
+        name = "Oddelenie"
 )
 @Entity
-public class Department {
+public class Department implements IDepartment {
     @Id
     private long pk;
 
-    @NotNull
-    @Unique
-    @Column(name = "name")
+    @Column(name = "nazov")
     private String name;
+
+
     private String code;
 
     public Department() {

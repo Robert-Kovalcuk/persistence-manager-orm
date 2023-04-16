@@ -1,17 +1,15 @@
 package sk.tuke.meta.example;
 
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
+import sk.tuke.meta.annotation.Unique;
 
-@Table(
-        name = "Person"
-)
+import javax.persistence.*;
+
 @Entity
 public class Person {
     @Id
     private long id;
+
+    @Column(name = "priezvisko")
     private String surname;
     private String name;
     private int age;

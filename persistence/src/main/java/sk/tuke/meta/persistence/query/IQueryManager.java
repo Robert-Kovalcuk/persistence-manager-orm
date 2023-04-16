@@ -3,6 +3,7 @@ package sk.tuke.meta.persistence.query;
 import data.EntityDTO;
 
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.Optional;
 
@@ -13,6 +14,6 @@ public interface IQueryManager {
     public Optional<ResultSet> select(String table, String... selectedColumns);
     public Optional<ResultSet> insert(EntityDTO entityDTO);
     public ResultSet delete(EntityDTO entityDTO);
-    public ResultSet update(EntityDTO entityDTO);
+    public ResultSet update(EntityDTO entityDTO) throws SQLException;
 
 }

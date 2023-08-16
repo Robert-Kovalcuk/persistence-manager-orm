@@ -3,7 +3,6 @@ package sk.tuke.meta.persistence;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.function.Function;
 import java.util.function.Supplier;
 public class LazyLoadingProxy<T> implements InvocationHandler {
 
@@ -15,7 +14,6 @@ public class LazyLoadingProxy<T> implements InvocationHandler {
         this.supplier = supplier;
         this.accessed = false;
     }
-
 
     public static <T> T createProxy(Class<T> clazz, Supplier<T> supplier) {
         return clazz.cast(Proxy.newProxyInstance(

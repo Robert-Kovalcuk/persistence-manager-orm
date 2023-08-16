@@ -227,9 +227,7 @@ public class ReflectivePersistenceManager implements PersistenceManager {
 
                 if (isEntity(field.getType())) {
                     Object nestedEntity = field.getType().getInterfaces()[0].cast(
-                            LazyLoadingProxy.createProxy(field.getType().getInterfaces()[0], () -> {
-                                return field.getType().getInterfaces()[0].cast(this.get(field.getType(), (int) columnValue).orElse(null));
-                            })
+                        LazyLoadingProxy.createProxy(field.getType().getInterfaces()[0], () -> this.get(field.getType(), (int) columnValue).orElse(null))
                     );
 
                     field.setAccessible(true);
